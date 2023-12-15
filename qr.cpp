@@ -4,6 +4,9 @@
 #include <qrencode.h>
 #include <png.h>
 #include <vector>
+#include <set>
+#include <map>
+#include <sstream>
 
 // Define a simple JSON parser function
 #include <sstream>
@@ -22,12 +25,28 @@ bool parseJsonFile(const char* filename, std::string& jsonData) {
     return true;
 }
 
+std::set<std::string> used_colors;
+
+std::string getRandomColor() {
+   std::string color;
+   while (true) {
+       color = std::to_string(rand() % 256) + "," +
+               std::to_string(rand() % 256) + "," +
+               std::to_string(rand() % 256);
+       if (used_colors.find(color) == used_colors.end()) {
+           used_colors.insert(color);
+           break;
+       }
+   }
+   return color;
+}
+
 void generateQRCodePNG(const char* final_data[], const char* filename) {
-   std::vector<std::vector<int>> qr_module;
+   std::vector<std::vector<int>> qr_modules;
    for (int i = 0; i < 3; ++i) {
         std::vector<int> module_values;
        QRcode* qr = QRcode_encodeString(final_data[i], 0, QR_ECLEVEL_L, QR_MODE_8, 1);
-
+        std::cout << "Number of modules in QR code " << i+1 << ": " << qr->width << std::endl;
        // Create a PNG file
        std::stringstream pngFilename;
        pngFilename << filename << "_" << i << ".png";
@@ -65,7 +84,7 @@ void generateQRCodePNG(const char* final_data[], const char* filename) {
            }
            png_write_row(png, row_pointers[y]);
        }
-        qr_module.push_back(module_values);
+        qr_modules.push_back(module_values);
        // Finalize writing
        png_write_end(png, nullptr);
 
@@ -79,6 +98,50 @@ void generateQRCodePNG(const char* final_data[], const char* filename) {
 
        std::cout << "QR code " << i+1 << " saved as " << pngFilename.str() << std::endl;
    }
+    std::set<std::string> unique_sequences;
+    std::map<std::string, int> sequence_numbers;
+    std::map<std::string, std::string> sequence_colors;
+
+    for (const auto& qr_module : qr_modules) {
+    for (int i = 0; i < qr_module.size(); ++i) {
+        std::stringstream sequence;
+        for (int j = 0; j < qr_modules.size(); ++j) {
+            sequence << qr_modules[j][i];
+        }
+        unique_sequences.insert(sequence.str());
+    }
+    }
+
+    int number = 0;
+    for (const auto& sequence : unique_sequences) {
+    sequence_numbers[sequence] = number++;
+    std::string color = getRandomColor();
+    sequence_colors[sequence] = color;
+    }
+    for (const auto& pair : sequence_numbers) {
+    std::cout << "Sequence: " << pair.first << ", Number: " << pair.second << std::endl;
+    }
+    std::vector<std::vector<std::string>> new_qr_module;
+
+    for (int i = 0; i < qr_modules[0].size(); ++i) {
+    std::string sequence;
+    for (const auto& qr_module : qr_modules) {
+        sequence += std::to_string(qr_module[i]);
+    }
+    std::vector<std::string> color_sequence;
+    for (int j = 0; j < qr_modules.size(); ++j) {
+        color_sequence.push_back(sequence_colors[sequence]);
+    }
+    new_qr_module.push_back(color_sequence);
+    }
+
+    std::string new_qr_string;
+for (const auto& color_sequence : new_qr_module) {
+ for (const auto& color : color_sequence) {
+   new_qr_string += color;
+ }
+}
+
 }
 
 int main() {
