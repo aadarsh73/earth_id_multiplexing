@@ -43,6 +43,8 @@ std::string getRandomColor() {
 
 void generateQRCodePNG(const char* final_data[], const char* filename) {
    std::vector<std::vector<int>> qr_modules;
+   std::map<std::string, std::string> sequence_colors;
+   std::vector<std::string> sequences;
    for (int i = 0; i < 3; ++i) {
         std::vector<int> module_values;
        QRcode* qr = QRcode_encodeString(final_data[i], 0, QR_ECLEVEL_L, QR_MODE_8, 1);
@@ -99,8 +101,9 @@ void generateQRCodePNG(const char* final_data[], const char* filename) {
        std::cout << "QR code " << i+1 << " saved as " << pngFilename.str() << std::endl;
    }
     std::set<std::string> unique_sequences;
+    
     std::map<std::string, int> sequence_numbers;
-    std::map<std::string, std::string> sequence_colors;
+    
 
     for (const auto& qr_module : qr_modules) {
     for (int i = 0; i < qr_module.size(); ++i) {
@@ -109,6 +112,7 @@ void generateQRCodePNG(const char* final_data[], const char* filename) {
             sequence << qr_modules[j][i];
         }
         unique_sequences.insert(sequence.str());
+        sequences.push_back(sequence.str());
     }
     }
 
@@ -118,8 +122,8 @@ void generateQRCodePNG(const char* final_data[], const char* filename) {
     std::string color = getRandomColor();
     sequence_colors[sequence] = color;
     }
-    for (const auto& pair : sequence_numbers) {
-    std::cout << "Sequence: " << pair.first << ", Number: " << pair.second << std::endl;
+    for (const auto& pair : sequence_colors) {
+    std::cout << "Sequence: " << pair.first<<" "<< pair.second<< std::endl;
     }
     std::vector<std::vector<std::string>> new_qr_module;
 
@@ -140,7 +144,66 @@ for (const auto& color_sequence : new_qr_module) {
  for (const auto& color : color_sequence) {
    new_qr_string += color;
  }
+
+
+
 }
+
+QRcode* qr = QRcode_encodeString(final_data[0], 0, QR_ECLEVEL_L, QR_MODE_8, 1);
+        std::cout << "Number of modules in final QR code " << ": " << qr->width << std::endl;
+       // Create a PNG file
+       std::stringstream pngFilename;
+       pngFilename << filename << "_" << "final" << ".png";
+       FILE* pngFile = fopen(pngFilename.str().c_str(), "wb");
+       png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+       png_infop info = png_create_info_struct(png);
+
+       // Set up error handling
+       if (setjmp(png_jmpbuf(png))) {
+           fclose(pngFile);
+           png_destroy_write_struct(&png, &info);
+           QRcode_free(qr);
+           std::cerr << "Error writing PNG file." << std::endl;
+           return;
+       }
+
+       png_init_io(png, pngFile);
+       // Set image properties
+       png_set_IHDR(png, info, qr->width, qr->width, 8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
+                   PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+
+       // Write header information
+       png_write_info(png, info);
+       // Allocate memory for image data
+       png_bytep row_pointers[qr->width];
+       for (int y = 0; y < qr->width; ++y) {
+           row_pointers[y] = new png_byte[3 * qr->width];
+           for (int x = 0; x < qr->width; ++x) {
+               int offset = y * qr->width + x;
+               std::map<std::string , std::string>::iterator it = sequence_colors.find(sequences[offset]);
+               std::string color = it->second;
+               std::stringstream colorStream(color);
+               int r, g, b;
+               char comma;
+               colorStream >> r>>comma>> g>>comma>> b;
+               row_pointers[y][3 * x] = r;
+               row_pointers[y][3 * x + 1] = g;
+               row_pointers[y][3 * x + 2] = b;
+           }
+           png_write_row(png, row_pointers[y]);
+       }
+       // Finalize writing
+       png_write_end(png, nullptr);
+
+       // Clean up
+       for (int y = 0; y < qr->width; ++y) {
+           delete[] row_pointers[y];
+       }
+       fclose(pngFile);
+       png_destroy_write_struct(&png, &info);
+       QRcode_free(qr);
+
+       std::cout << "QR code " << "final" << " saved as " << pngFilename.str() << std::endl;
 
 }
 
