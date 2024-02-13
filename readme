@@ -1,0 +1,5 @@
+Compilation (for mac) :
+
+brew install libqrencode
+brew install libpng
+g++ -I/opt/homebrew/Cellar/qrencode/4.1.1/include/ -I/opt/homebrew/Cellar/libpng/1.6.42/include/ -o myprogram main.cpp -L/opt/homebrew/lib -lqrencode -lpng
